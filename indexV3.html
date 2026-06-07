@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUSOS Ulm - Lobbycard Assistent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        
+        .fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(10px); }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Versteckt die Pfeile in Nummern-Eingabefeldern */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between antialiased selection:bg-red-100 selection:text-red-900">
+
+    <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="text-xl font-extrabold text-slate-900 tracking-tight">JUSOS <span class="text-red-600">ULM</span></div>
+            </div>
+            <div class="flex items-center gap-4">
+                <h1 class="text-base font-bold tracking-tight text-slate-700 hidden sm:block">Lobbycard Assistent</h1>
+                <span class="bg-green-50 border border-green-200 text-green-700 text-xs px-3 py-1.5 rounded-full font-semibold flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    Lokal & Sicher
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow w-full max-w-2xl mx-auto p-4 sm:p-6 flex flex-col justify-center relative z-10">
+        <div class="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden flex flex-col min-h-[500px] transition-all" id="wizard-card">
+            
+            <div class="h-1.5 w-full bg-slate-100">
+                <div id="progress-bar" class="h-full bg-red-600 transition-all duration-500 ease-out w-0"></div>
+            </div>
+
+            <div class="p-8 sm:p-10 flex-grow flex flex-col justify-center fade-in-up custom-scrollbar max-h-[75vh] overflow-y-auto" id="step-content"></div>
+            
+            <div class="px-8 py-5 bg-slate-50/80 border-t border-slate-100 flex justify-between items-center" id="nav-buttons">
+                <button id="btn-back" class="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-900 transition invisible rounded-xl hover:bg-slate-200 active:scale-95" onclick="prevStep()"></button>
+                <button id="btn-next" class="px-8 py-3 bg-red-600 text-white text-sm font-semibold rounded-xl shadow-md hover:bg-red-700 hover:shadow-lg transition-all active:scale-95" onclick="nextStep()"></button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-50 py-8 text-center mt-6 border-t border-slate-200 relative z-10">
+        <div class="max-w-2xl mx-auto px-6 space-y-2">
+            <p class="text-xs font-bold tracking-widest text-slate-400 uppercase">Ein digitaler Service der JUSOS ULM</p>
+            <p class="text-xs text-slate-500 leading-relaxed max-w-lg mx-auto">
+                Diese Anwendung läuft zu 100% in Ihrem Browser. Es werden keine persönlichen Daten auf Server übertragen. Nach dem Schließen des Fensters sind alle Angaben gelöscht.
+            </p>
+        </div>
+    </footer>
+
+    <button onclick="openHelpModal()" class="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 bg-white border border-slate-200 text-slate-700 p-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all z-40 flex items-center gap-3">
+        <div class="bg-blue-100 text-blue-600 p-1.5 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <span id="help-btn-text" class="hidden sm:block font-semibold text-sm pr-1">Hilfe / Help</span>
+    </button>
+
+    <div id="help-modal" onclick="if(event.target === this) closeHelpModal()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4 transition-opacity">
+        <div class="bg-white border border-slate-100 rounded-[2rem] max-w-md w-full shadow-2xl overflow-hidden fade-in-up">
+            <div class="p-8">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 id="help-title" class="text-xl font-bold text-slate-900 pr-4 tracking-tight">Du brauchst Hilfe beim Ausfüllen?</h3>
+                    <button onclick="closeHelpModal()" class="text-slate-400 hover:text-slate-800 p-1 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors leading-none w-8 h-8 flex items-center justify-center">✕</button>
+                </div>
+                <p id="help-text" class="text-sm text-slate-500 mb-6 leading-relaxed">Wähle deinen Wohnort aus, um die zuständige Anlaufstelle in Ulm zu finden:</p>
+                
+                <select id="help-region-select" onchange="showRegionInfo()" class="w-full p-4 border border-slate-200 rounded-xl bg-white text-slate-800 font-medium outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm mb-4 cursor-pointer">
+                    <option value="">-- Bitte wählen --</option>
+                    <option value="mitte_ost">Stadtmitte / Oststadt</option>
+                    <option value="west">Weststadt / Söflingen / Vororte im Westen</option>
+                    <option value="eselsberg">Eselsberg</option>
+                    <option value="boefingen">Böfingen / Lehr / Jungingen / Mähringen</option>
+                    <option value="wiblingen">Wiblingen / Vororte im Süden</option>
+                </select>
+
+                <div id="help-result" class="hidden bg-blue-50 p-6 rounded-2xl border border-blue-100 fade-in-up mt-2">
+                    <p class="text-[10px] text-blue-600 uppercase tracking-widest font-bold mb-2">Zuständige Erstanlaufstelle</p>
+                    <p id="help-address" class="text-slate-800 font-semibold whitespace-pre-line text-sm leading-relaxed"></p>
+                    <a id="help-phone" href="#" class="inline-flex items-center gap-2 mt-5 text-blue-700 hover:text-blue-800 bg-white shadow-sm border border-blue-200 hover:border-blue-300 px-4 py-2.5 rounded-xl transition-all w-fit font-semibold text-sm hover:shadow">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                        <span class="tracking-wide"></span>
+                    </a>
+                </div>
+            </div>
+            <div class="p-5 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button onclick="closeHelpModal()" id="help-close-btn" class="text-sm font-semibold text-slate-600 hover:text-slate-900 px-5 py-2.5 hover:bg-slate-200 rounded-xl transition-all">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sozialraeume = [
+            { id: 'mitte_ost', address: 'Sozialer Dienst Mitte/Ost\nGrüner Hof 5\n89073 Ulm', phone: '0731 161 5153' },
+            { id: 'west', address: 'Sozialer Dienst Weststadt\nMoltkestraße 20\n89077 Ulm', phone: '0731 161 5262' },
+            { id: 'eselsberg', address: 'Sozialer Dienst Eselsberg\nVirchowstraße 4\n89075 Ulm', phone: '0731 161 5322' },
+            { id: 'boefingen', address: 'Sozialer Dienst Böfingen\nHaslacher Weg 89/91\n89075 Ulm', phone: '0731 161 5249' },
+            { id: 'wiblingen', address: 'Sozialer Dienst Wiblingen\nBuchauer Straße 8-10\n89079 Ulm', phone: '0731 161 5030' }
+        ];
+
+        const translations = {
+            de: {
+                next: "Weiter", back: "Zurück", generate: "Antrag jetzt erstellen 📥", fill_all: "Bitte fülle alle Pflichtfelder (*) aus.", choose: "Bitte wählen", add: "Hinzufügen", remove: "Löschen",
+                person: "Person", type: "Art", amount: "Betrag (€)", applicant: "Antragsteller/in",
+                help_btn: "Hilfe?", help_modal_title: "Fragen zum Antrag?", help_modal_text: "Wähle deinen Wohnort aus, um die zuständige Anlaufstelle in Ulm zu finden:", help_close: "Schließen",
+                step1_title: "Willkommen", step1_text: "Dieser Assistent hilft dir, den offiziellen Antrag in wenigen Minuten auszufüllen.",
+                step2_title: "Art des Antrags", step2_text: "Ist dies dein erster Antrag oder möchtest du deine Lobbycard verlängern?", type_new: "Erstantrag", type_renewal: "Verlängerung",
+                info_antragsart: "<b>Erstantrag:</b> Du beantragst die Karte zum ersten Mal.<br><b>Verlängerung:</b> Du hast schon eine Karte und brauchst eine neue.",
+                step3_title: "Wohnort", step3_text: "Wohnst du in Ulm oder gehst du hier zur Schule?", step3_yes: "Ja, in Ulm", step3_no: "Nein, woanders",
+                step4_title: "Staatliche Hilfen", step4_text: "Bekommt jemand in deinem Haushalt staatliche Leistungen (z. B. Bürgergeld, Wohngeld, Kinderzuschlag)?", step4_yes: "Ja", step4_no: "Nein",
+                info_benefits: "Damit ist Geld gemeint, das du vom Staat zum Leben bekommst (z.B. vom Jobcenter oder Sozialamt).",
+                step5_title: "Welche Leistung?", step5_text: "Wähle die Leistung aus, die ihr hauptsächlich bezieht.", step5_labels: { Bürgergeld: "Bürgergeld", Wohngeld: "Wohngeld", Kinderzuschlag: "Kinderzuschlag", Grundsicherung: "Grundsicherung", Asylbewerber: "Asylbewerberleistungen" },
+                step6_title: "Persönliche Daten", step6_name: "Nachname", step6_vorname: "Vorname", step6_birthdate: "Geburtsdatum", step6_street: "Straße & Hausnummer", step6_city: "PLZ & Ort", step6_phone: "Telefonnummer (Optional)",
+                step7_title: "Haushalt", step7_text: "Füge weitere Personen im Haushalt hinzu (Optional)", partner_name: "Name, Vorname (Partner/in)", partner_geb: "Geburtsdatum", kind_name: "Name, Vorname (Kind)", kind_geb: "Geburtsdatum", add_kind: "+ Kind hinzufügen",
+                step8_title: "Einkommen", step8_text: "Bitte trage alle Netto-Einkommen deines Haushalts ein.",
+                info_income: "Trage hier das <b>Netto-Einkommen</b> ein (das Geld, das nach Abzug von Steuern auf dem Konto landet).",
+                no_income_added: "Noch kein Einkommen erfasst.",
+                inc_1: "Lohn / Gehalt", inc_2: "Selbstständigkeit", inc_3: "Elterngeld", inc_4: "Arbeitslosengeld 1", inc_5: "Unterhalt", inc_6: "Krankengeld", inc_7: "Rente", inc_8: "Weitere Renten", inc_9: "Kindergeld", inc_10: "Mieteinnahmen", inc_11: "Sonstiges",
+                step9_title: "Fast geschafft!", step9_text: "Dein Dokument ist fertig. Lade das PDF herunter, drucke es aus, unterschreibe es und reiche es zusammen mit deinen Nachweisen ein.",
+                no_entitlement_title: "Leider kein Anspruch", no_entitlement_text: "Die Lobbycard wird ausschließlich an Personen vergeben, die in Ulm wohnen oder dort zur Schule gehen."
+            },
+            en: {
+                next: "Next", back: "Back", generate: "Generate Form 📥", fill_all: "Please fill all required fields (*).", choose: "Please select", add: "Add", remove: "Remove",
+                person: "Person", type: "Type", amount: "Amount (€)", applicant: "Applicant",
+                help_btn: "Help?", help_modal_title: "Need help?", help_modal_text: "Select where you live to find the responsible contact point in Ulm:", help_close: "Close",
+                step1_title: "Welcome", step1_text: "Select your language to start:",
+                step2_title: "Application Type", step2_text: "Is this your first application or a renewal?", type_new: "First Application", type_renewal: "Renewal",
+                info_antragsart: "<b>First application:</b> Applying for the first time.<br><b>Renewal:</b> You already have a card and need a new one.",
+                step3_title: "Residence", step3_text: "Do you live or study in Ulm?", step3_yes: "Yes", step3_no: "No",
+                step4_title: "State benefits", step4_text: "Does your household receive state benefits?", step4_yes: "Yes", step4_no: "No",
+                info_benefits: "Money you receive from the state to live on (e.g., from the Jobcenter).",
+                step5_title: "Which benefit?", step5_text: "Which primary benefit do you receive?", step5_labels: { Bürgergeld: "Bürgergeld", Wohngeld: "Housing Benefit", Kinderzuschlag: "Child Supplement", Grundsicherung: "Basic Security", Asylbewerber: "Asylum Benefits" },
+                step6_title: "Personal Data", step6_name: "Last Name", step6_vorname: "First Name", step6_birthdate: "Date of Birth", step6_street: "Street & House No.", step6_city: "Postal Code & City", step6_phone: "Phone Number",
+                step7_title: "Household", step7_text: "Add other household members (Optional)", partner_name: "Partner's Name", partner_geb: "Date of Birth", kind_name: "Child's Name", kind_geb: "Date of Birth", add_kind: "+ Add Child",
+                step8_title: "Income", step8_text: "Please add all net incomes for your household.",
+                info_income: "Enter the <b>net income</b> (money that actually arrives in your bank account).",
+                no_income_added: "No income added yet.",
+                inc_1: "Salary", inc_2: "Self-employment", inc_3: "Parental allowance", inc_4: "Unemployment benefit I", inc_5: "Alimony", inc_6: "Sick pay", inc_7: "Pension", inc_8: "Other pensions", inc_9: "Child benefit", inc_10: "Rental income", inc_11: "Other",
+                step9_title: "Done!", step9_text: "Download the PDF, print, and sign it. Attach copies of your proofs.",
+                no_entitlement_title: "No entitlement", no_entitlement_text: "Only for residents of Ulm."
+            },
+            tr: {
+                next: "İleri", back: "Geri", generate: "Formu Oluştur 📥", fill_all: "Lütfen zorunlu alanları doldurun (*).", choose: "Seçiniz", add: "Ekle", remove: "Sil",
+                person: "Kişi", type: "Tür", amount: "Miktar (€)", applicant: "Başvuran",
+                help_btn: "Yardım?", help_modal_title: "Yardım lazım mı?", help_modal_text: "Ulm'daki yetkili kurumu bulmak için bölgenizi seçin:", help_close: "Kapat",
+                step1_title: "Hoş Geldiniz", step1_text: "Başlamak için dilinizi seçin:",
+                step2_title: "Başvuru Türü", step2_text: "Bu ilk başvurunuz mu, yenileme mi?", type_new: "İlk başvuru", type_renewal: "Yenileme",
+                info_antragsart: "<b>İlk başvuru:</b> Kartı ilk defa talep ediyorsunuz.<br><b>Yenileme:</b> Mevcut kartı yeniliyorsunuz.",
+                step3_title: "İkamet", step3_text: "Ulm'da mı yaşıyorsunuz veya okuyorsunuz?", step3_yes: "Evet", step3_no: "Hayır",
+                step4_title: "Devlet yardımları", step4_text: "Haneniz devlet yardımı alıyor mu?", step4_yes: "Evet", step4_no: "Hayır",
+                info_benefits: "Devletten yaşamak için aldığınız para (ör. Jobcenter).",
+                step5_title: "Hangi yardım?", step5_text: "Hangi yardımı alıyorsunuz?", step5_labels: { Bürgergeld: "Bürgergeld", Wohngeld: "Kira yardımı", Kinderzuschlag: "Çocuk ilavesi", Grundsicherung: "Temel güvence", Asylbewerber: "Sığınmacı yardımları" },
+                step6_title: "Kişisel Bilgiler", step6_name: "Soyadınız", step6_vorname: "Adınız", step6_birthdate: "Doğum Tarihi", step6_street: "Sokak ve Kapı No", step6_city: "Posta Kodu ve Şehir", step6_phone: "Telefon",
+                step7_title: "Hane", step7_text: "Diğer hane üyeleri (İsteğe bağlı)", partner_name: "Eşin Adı", partner_geb: "Doğum Tarihi", kind_name: "Çocuğun Adı", kind_geb: "Doğum Tarihi", add_kind: "+ Çocuk Ekle",
+                step8_title: "Gelir", step8_text: "Lütfen net gelirleri ekleyin.",
+                info_income: "Lütfen <b>net geliri</b> girin (vergilerden sonra ele geçen para).",
+                no_income_added: "Henüz gelir eklenmedi.",
+                inc_1: "Maaş", inc_2: "Serbest meslek", inc_3: "Ebeveyn parası", inc_4: "İşsizlik maaşı", inc_5: "Nafaka", inc_6: "Hastalık parası", inc_7: "Emeklilik", inc_8: "Diğer emeklilik", inc_9: "Çocuk parası", inc_10: "Kira geliri", inc_11: "Diğer",
+                step9_title: "Bitti!", step9_text: "PDF'yi indirin, yazdırın ve imzalayın.",
+                no_entitlement_title: "Hak sahibi değilsiniz", no_entitlement_text: "Sadece Ulm sakinleri içindir."
+            },
+            ar: {
+                next: "التالي", back: "رجوع", generate: "إنشاء النموذج 📥", fill_all: "يرجى ملء جميع الحقول (*).", choose: "يرجى الاختيار", add: "إضافة", remove: "إزالة",
+                person: "شخص", type: "النوع", amount: "المبلغ", applicant: "مقدم الطلب",
+                help_btn: "مساعدة؟", help_modal_title: "هل تحتاج مساعدة؟", help_modal_text: "حدد مكان إقامتك للعثور على نقطة الاتصال:", help_close: "إغلاق",
+                step1_title: "مرحباً", step1_text: "الرجاء اختيار لغتك:",
+                step2_title: "نوع الطلب", step2_text: "هل هذا طلب أول أم تجديد؟", type_new: "طلب أول", type_renewal: "تجديد",
+                info_antragsart: "<b>طلب أول:</b> لأول مرة.<br><b>تجديد:</b> لديك بطاقة وتريد تجديدها.",
+                step3_title: "الإقامة", step3_text: "هل تعيش في أولم؟", step3_yes: "نعم", step3_no: "لا",
+                step4_title: "المساعدات", step4_text: "هل تتلقى مساعدات حكومية؟", step4_yes: "نعم", step4_no: "لا",
+                info_benefits: "الأموال التي تتلقاها من الدولة للعيش.",
+                step5_title: "أي مساعدة؟", step5_text: "ما هي المساعدة؟", step5_labels: { Bürgergeld: "Bürgergeld", Wohngeld: "مساعدة الإسكان", Kinderzuschlag: "إضافة الأطفال", Grundsicherung: "الضمان الأساسي", Asylbewerber: "إعانات اللجوء" },
+                step6_title: "البيانات", step6_name: "الاسم العائلة", step6_vorname: "الاسم الأول", step6_birthdate: "تاريخ الميلاد", step6_street: "الشارع والمنزل", step6_city: "الرمز البريدي والمدينة", step6_phone: "رقم الهاتف",
+                step7_title: "الأسرة", step7_text: "أفراد الأسرة (اختياري)", partner_name: "اسم الشريك", partner_geb: "تاريخ الميلاد", kind_name: "اسم الطفل", kind_geb: "تاريخ الميلاد", add_kind: "+ إضافة طفل",
+                step8_title: "الدخل", step8_text: "يرجى إضافة الدخل الصافي.",
+                info_income: "الرجاء إدخال <b>الدخل الصافي</b> (المال بعد الضرائب).",
+                no_income_added: "لا يوجد دخل.",
+                inc_1: "الراتب", inc_2: "العمل الحر", inc_3: "بدل الوالدين", inc_4: "بطالة", inc_5: "نفقة", inc_6: "مرض", inc_7: "تقاعد", inc_8: "تقاعد آخر", inc_9: "إعانة الطفل", inc_10: "إيجار", inc_11: "أخرى",
+                step9_title: "اكتمل!", step9_text: "قم بتنزيل ملف PDF واطبعه ووقعه.",
+                no_entitlement_title: "غير مستوفٍ", no_entitlement_text: "فقط لسكان أولم."
+            },
+            uk: {
+                next: "Далі", back: "Назад", generate: "Створити заяву 📥", fill_all: "Заповніть усі поля (*).", choose: "Виберіть", add: "Додати", remove: "Видалити",
+                person: "Особа", type: "Тип", amount: "Сума", applicant: "Заявник",
+                help_btn: "Допомога?", help_modal_title: "Потрібна допомога?", help_modal_text: "Виберіть район для пошуку установи:", help_close: "Закрити",
+                step1_title: "Ласкаво просимо", step1_text: "Виберіть мову:",
+                step2_title: "Тип заяви", step2_text: "Перша заява чи подовження?", type_new: "Перша", type_renewal: "Подовження",
+                info_antragsart: "<b>Перша:</b> Вперше.<br><b>Подовження:</b> Оновлення картки.",
+                step3_title: "Місце проживання", step3_text: "Ви живете в Ульмі?", step3_yes: "Так", step3_no: "Ні",
+                step4_title: "Державна допомога", step4_text: "Чи отримуєте ви допомогу?", step4_yes: "Так", step4_no: "Ні",
+                info_benefits: "Гроші від держави (Jobcenter тощо).",
+                step5_title: "Яка допомога?", step5_text: "Яку допомогу отримуєте?", step5_labels: { Bürgergeld: "Bürgergeld", Wohngeld: "На житло", Kinderzuschlag: "На дитину", Grundsicherung: "Базове забезпечення", Asylbewerber: "Для біженців" },
+                step6_title: "Особисті дані", step6_name: "Прізвище", step6_vorname: "Ім'я", step6_birthdate: "Дата народження", step6_street: "Вулиця та номер", step6_city: "Індекс та місто", step6_phone: "Телефон",
+                step7_title: "Сім'я", step7_text: "Члени сім'ї (необов'язково)", partner_name: "Ім'я партнера", partner_geb: "Дата народження", kind_name: "Ім'я дитини", kind_geb: "Дата народження", add_kind: "+ Дитину",
+                step8_title: "Дохід", step8_text: "Вкажіть чистий дохід (нетто).",
+                info_income: "Вкажіть <b>чистий дохід</b> (гроші після податків).",
+                no_income_added: "Дохід не додано.",
+                inc_1: "Зарплата", inc_2: "Самозайнятість", inc_3: "На дитину (Elterngeld)", inc_4: "Безробіття", inc_5: "Аліменти", inc_6: "Лікарняні", inc_7: "Пенсія", inc_8: "Інші пенсії", inc_9: "Kindergeld", inc_10: "Оренда", inc_11: "Інше",
+                step9_title: "Готово!", step9_text: "Завантажте PDF, роздрукуйте та підпишіть.",
+                no_entitlement_title: "Немає права", no_entitlement_text: "Тільки для Ульма."
+            },
+            fa: {
+                next: "بعدی", back: "بازگشت", generate: "ایجاد فرم 📥", fill_all: "فیلدهای الزامی (*) را پر کنید.", choose: "انتخاب کنید", add: "افزودن", remove: "حذف",
+                person: "شخص", type: "نوع", amount: "مبلغ", applicant: "متقاضی",
+                help_btn: "راهنمایی؟", help_modal_title: "نیاز به کمک دارید؟", help_modal_text: "منطقه خود را انتخاب کنید:", help_close: "بستن",
+                step1_title: "خوش آمدید", step1_text: "زبان خود را انتخاب کنید:",
+                step2_title: "نوع درخواست", step2_text: "اولین درخواست یا تمدید؟", type_new: "اولین", type_renewal: "تمدید",
+                info_antragsart: "<b>اولین:</b> برای اولین بار.<br><b>تمدید:</b> کارت قبلی را تمدید می‌کنید.",
+                step3_title: "محل اقامت", step3_text: "در اولم زندگی می‌کنید؟", step3_yes: "بله", step3_no: "خیر",
+                step4_title: "کمک دولتی", step4_text: "آیا کمک دولتی دریافت می‌کنید؟", step4_yes: "بله", step4_no: "خیر",
+                info_benefits: "پولی که از دولت می‌گیرید (مثل جاب‌سنتر).",
+                step5_title: "کدام کمک؟", step5_text: "کدام کمک را می‌گیرید؟", step5_labels: { Bürgergeld: "Bürgergeld", Wohngeld: "کمک مسکن", Kinderzuschlag: "مکمل کودک", Grundsicherung: "تأمین پایه", Asylbewerber: "پناهجویان" },
+                step6_title: "اطلاعات شخصی", step6_name: "نام خانوادگی", step6_vorname: "نام", step6_birthdate: "تاریخ تولد", step6_street: "خیابان و پلاک", step6_city: "کد پستی و شهر", step6_phone: "تلفن",
+                step7_title: "خانواده", step7_text: "اعضای خانواده (اختیاری)", partner_name: "نام شریک", partner_geb: "تاریخ تولد", kind_name: "نام کودک", kind_geb: "تاریخ تولد", add_kind: "+ افزودن کودک",
+                step8_title: "درآمد", step8_text: "درآمد خالص را وارد کنید.",
+                info_income: "لطفاً <b>درآمد خالص</b> (پس از کسر مالیات) را وارد کنید.",
+                no_income_added: "درآمدی ثبت نشده.",
+                inc_1: "حقوق", inc_2: "خوداشتغالی", inc_3: "کمک والدین", inc_4: "بیکاری", inc_5: "نفقه", inc_6: "بیماری", inc_7: "بازنشستگی", inc_8: "سایر مستمری‌ها", inc_9: "حق اولاد", inc_10: "اجاره", inc_11: "سایر",
+                step9_title: "پایان!", step9_text: "PDF را دانلود، چاپ و امضا کنید.",
+                no_entitlement_title: "واجد شرایط نیستید", no_entitlement_text: "فقط برای ساکنان اولم."
+            }
+        };
+
+        let data = { 
+            language: 'de', isNewApplication: null, livesInUlm: null, receivesBenefits: null, benefitType: '', 
+            name: '', vorname: '', geburtsdatum: '', strasse: '', ort: '', telefon: '',
+            partnerName: '', partnerGeburtsdatum: '', kinder: [], incomes: [] 
+        };
+        let currentStep = 1;
+        const totalSteps = 9; 
+
+        function t(key) { return translations[data.language]?.[key] || translations['de'][key] || key; }
+
+        function setLanguage(lang) {
+            data.language = lang;
+            document.documentElement.dir = (lang === 'ar' || lang === 'fa') ? 'rtl' : 'ltr';
+            
+            document.getElementById('help-btn-text').innerText = t('help_btn');
+            document.getElementById('help-title').innerText = t('help_modal_title');
+            document.getElementById('help-text').innerText = t('help_modal_text');
+            document.getElementById('help-close-btn').innerText = t('help_close');
+            document.getElementById('help-region-select').options[0].text = t('choose');
+            
+            nextStep();
+        }
+
+        function openHelpModal() {
+            const modal = document.getElementById('help-modal');
+            modal.classList.remove('hidden');
+            void modal.offsetWidth;
+            modal.querySelector('div').classList.add('fade-in-up');
+            
+            document.getElementById('help-region-select').value = "";
+            document.getElementById('help-result').classList.add('hidden');
+        }
+
+        function closeHelpModal() {
+            document.getElementById('help-modal').classList.add('hidden');
+        }
+
+        function showRegionInfo() {
+            const val = document.getElementById('help-region-select').value;
+            const resDiv = document.getElementById('help-result');
+            if (!val) { resDiv.classList.add('hidden'); return; }
+            
+            const sr = sozialraeume.find(s => s.id === val);
+            document.getElementById('help-address').innerText = sr.address;
+            document.getElementById('help-phone').href = 'tel:' + sr.phone.replace(/\s+/g, '');
+            document.getElementById('help-phone').querySelector('span').innerText = sr.phone;
+            
+            resDiv.classList.remove('hidden');
+            resDiv.classList.remove('fade-in-up');
+            void resDiv.offsetWidth;
+            resDiv.classList.add('fade-in-up');
+        }
+
+        function renderInfoBox(htmlContent) {
+            return `
+            <div class="flex items-start gap-3 bg-blue-50/80 border border-blue-100 p-4 mt-5 rounded-2xl">
+                <div class="text-blue-500 mt-0.5">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div class="text-sm text-blue-900 leading-relaxed">${htmlContent}</div>
+            </div>`;
+        }
+
+        function addKind() { if(data.kinder.length < 5) { data.kinder.push({name: '', geburtsdatum: ''}); renderStep(); } }
+        function updateKind(index, field, value) { data.kinder[index][field] = value; }
+        function removeKind(index) { data.kinder.splice(index, 1); renderStep(); }
+
+        function addIncome() {
+            const pId = document.getElementById('inc_person').value;
+            const tId = document.getElementById('inc_type').value;
+            const amt = document.getElementById('inc_amount').value;
+            if(!pId || !tId || !amt || amt <= 0) return;
+            data.incomes.push({ personId: parseInt(pId), typeId: parseInt(tId), amount: parseFloat(amt).toFixed(2) });
+            renderStep();
+        }
+        function removeIncome(index) { data.incomes.splice(index, 1); renderStep(); }
+
+        function updateProgress() {
+            const bar = document.getElementById('progress-bar');
+            const percent = currentStep === 99 ? 100 : Math.min(100, Math.max(5, (currentStep / totalSteps) * 100));
+            bar.style.width = `${percent}%`;
+            if(percent === 100) bar.classList.replace('bg-red-600', 'bg-green-500');
+            else bar.classList.replace('bg-green-500', 'bg-red-600');
+        }
+
+        function renderStep() {
+            const content = document.getElementById('step-content');
+            const btnNext = document.getElementById('btn-next');
+            const btnBack = document.getElementById('btn-back');
+
+            updateProgress();
+
+            content.classList.remove('fade-in-up');
+            void content.offsetWidth;
+            content.classList.add('fade-in-up');
+
+            btnBack.innerText = t('back');
+            btnBack.classList.toggle('invisible', currentStep === 1 || currentStep === 99);
+            btnNext.innerText = t('next');
+            btnNext.onclick = nextStep;
+            btnNext.classList.remove('hidden');
+
+            const inputClasses = "w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 hover:bg-white text-slate-900 outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-500 focus:bg-white transition-all shadow-sm";
+            const labelClasses = "block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 ml-1";
+
+            if (currentStep === 1) {
+                // Dynamische Schriftrichtung für Arabisch / Persisch
+                const isRtl = (lang) => lang === 'ar' || lang === 'fa';
+                
+                content.innerHTML = `
+                    <div class="text-center max-w-lg mx-auto space-y-6 mt-2">
+                        <div class="flex justify-center mb-6">
+                            <img src="logo.png" alt="JUSOS Ulm Logo" class="h-16 sm:h-20 w-auto object-contain drop-shadow-sm">
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Sprache / Language / لغة</h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
+                            <button onclick="setLanguage('de')" class="p-4 border border-slate-200 rounded-2xl bg-white hover:border-red-300 hover:shadow-md transition-all text-slate-800 font-semibold text-base shadow-sm flex items-center justify-center gap-2.5">
+                                <span class="text-[10px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">DE</span> Deutsch
+                            </button>
+                            <button onclick="setLanguage('en')" class="p-4 border border-slate-200 rounded-2xl bg-white hover:border-red-300 hover:shadow-md transition-all text-slate-800 font-semibold text-base shadow-sm flex items-center justify-center gap-2.5">
+                                <span class="text-[10px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">GB</span> English
+                            </button>
+                            <button onclick="setLanguage('tr')" class="p-4 border border-slate-200 rounded-2xl bg-white hover:border-red-300 hover:shadow-md transition-all text-slate-800 font-semibold text-base shadow-sm flex items-center justify-center gap-2.5">
+                                <span class="text-[10px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">TR</span> Türkçe
+                            </button>
+                            <button onclick="setLanguage('uk')" class="p-4 border border-slate-200 rounded-2xl bg-white hover:border-red-300 hover:shadow-md transition-all text-slate-800 font-semibold text-base shadow-sm flex items-center justify-center gap-2.5">
+                                <span class="text-[10px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">UA</span> Українська
+                            </button>
+                            <button onclick="setLanguage('ar')" dir="rtl" class="p-4 border border-slate-200 rounded-2xl bg-white hover:border-red-300 hover:shadow-md transition-all text-slate-800 font-semibold text-base shadow-sm flex items-center justify-center gap-2.5">
+                                العربية <span class="text-[10px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded ml-1" dir="ltr">SY</span>
+                            </button>
+                            <button onclick="setLanguage('fa')" dir="rtl" class="p-4 border border-slate-200 rounded-2xl bg-white hover:border-red-300 hover:shadow-md transition-all text-slate-800 font-semibold text-base shadow-sm flex items-center justify-center gap-2.5">
+                                فارسی <span class="text-[10px] font-extrabold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded ml-1" dir="ltr">IR</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                btnNext.classList.add('hidden'); 
+            } 
+            else if (currentStep === 2) {
+                content.innerHTML = `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step2_title')}</h2>
+                        <p class="text-slate-500 mt-2 text-base">${t('step2_text')}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-8">
+                        <button onclick="selectOption('isNewApplication', true)" class="p-6 border-2 rounded-2xl font-semibold transition-all shadow-sm ${data.isNewApplication === true ? 'border-red-500 bg-red-50 text-red-900 shadow-red-100' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}">${t('type_new')}</button>
+                        <button onclick="selectOption('isNewApplication', false)" class="p-6 border-2 rounded-2xl font-semibold transition-all shadow-sm ${data.isNewApplication === false ? 'border-red-500 bg-red-50 text-red-900 shadow-red-100' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}">${t('type_renewal')}</button>
+                    </div>
+                    ${renderInfoBox(t('info_antragsart'))}
+                </div>`;
+            }
+            else if (currentStep === 3) {
+                content.innerHTML = `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step3_title')}</h2>
+                        <p class="text-slate-500 mt-2 text-base">${t('step3_text')}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-8">
+                        <button onclick="selectOption('livesInUlm', true)" class="p-6 border-2 rounded-2xl font-semibold transition-all shadow-sm ${data.livesInUlm === true ? 'border-red-500 bg-red-50 text-red-900 shadow-red-100' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}">${t('step3_yes')}</button>
+                        <button onclick="selectOption('livesInUlm', false)" class="p-6 border-2 rounded-2xl font-semibold transition-all shadow-sm ${data.livesInUlm === false ? 'border-red-500 bg-red-50 text-red-900 shadow-red-100' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}">${t('step3_no')}</button>
+                    </div>
+                </div>`;
+            }
+            else if (currentStep === 4) {
+                content.innerHTML = `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step4_title')}</h2>
+                        <p class="text-slate-500 mt-2 text-base leading-relaxed">${t('step4_text')}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-8">
+                        <button onclick="selectOption('receivesBenefits', true)" class="p-6 border-2 rounded-2xl font-semibold transition-all shadow-sm ${data.receivesBenefits === true ? 'border-red-500 bg-red-50 text-red-900 shadow-red-100' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}">${t('step4_yes')}</button>
+                        <button onclick="selectOption('receivesBenefits', false)" class="p-6 border-2 rounded-2xl font-semibold transition-all shadow-sm ${data.receivesBenefits === false ? 'border-red-500 bg-red-50 text-red-900 shadow-red-100' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}">${t('step4_no')}</button>
+                    </div>
+                    ${renderInfoBox(t('info_benefits'))}
+                </div>`;
+            }
+            else if (currentStep === 5) {
+                let options = `<option value="">${t('choose')}</option>`;
+                for (const [key, val] of Object.entries(t('step5_labels'))) { options += `<option value="${key}" ${data.benefitType === key ? 'selected' : ''}>${val}</option>`; }
+                content.innerHTML = `
+                <div class="space-y-6">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step5_title')}</h2>
+                        <p class="text-slate-500 mt-2 text-base">${t('step5_text')}</p>
+                    </div>
+                    <div class="mt-8">
+                        <select id="benefitType" onchange="data.benefitType = this.value" class="${inputClasses} cursor-pointer font-medium text-base shadow-sm">
+                            ${options}
+                        </select>
+                    </div>
+                </div>`;
+            }
+            else if (currentStep === 6) {
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <div>
+                            <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step6_title')}</h2>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-6">
+                            <div><label class="${labelClasses}">${t('step6_vorname')}*</label><input type="text" value="${data.vorname}" oninput="data.vorname = this.value" class="${inputClasses}" dir="auto"></div>
+                            <div><label class="${labelClasses}">${t('step6_name')}*</label><input type="text" value="${data.name}" oninput="data.name = this.value" class="${inputClasses}" dir="auto"></div>
+                        </div>
+                        <div><label class="${labelClasses}">${t('step6_birthdate')}*</label><input type="date" value="${data.geburtsdatum}" onchange="data.geburtsdatum = this.value" class="${inputClasses} ltr-force" style="text-align: left;" dir="ltr"></div>
+                        <div class="border-t border-slate-100 my-4 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="sm:col-span-2"><label class="${labelClasses}">${t('step6_street')}*</label><input type="text" value="${data.strasse}" oninput="data.strasse = this.value" class="${inputClasses}" dir="auto"></div>
+                            <div><label class="${labelClasses}">${t('step6_city')}*</label><input type="text" value="${data.ort}" oninput="data.ort = this.value" class="${inputClasses}" dir="auto"></div>
+                            <div><label class="${labelClasses}">${t('step6_phone')}</label><input type="text" value="${data.telefon}" oninput="data.telefon = this.value" class="${inputClasses}" dir="ltr"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            else if (currentStep === 7) {
+                let kinderHtml = '';
+                data.kinder.forEach((k, index) => {
+                    kinderHtml += `
+                        <div class="p-5 bg-white border border-slate-200 rounded-2xl relative mt-4 shadow-sm group hover:border-slate-300 transition-colors">
+                            <button onclick="removeKind(${index})" class="absolute top-3 right-4 text-slate-400 hover:text-red-500 text-sm font-medium transition-colors">${t('remove')}</button>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                                <div><label class="${labelClasses}">${t('kind_name')}</label><input type="text" value="${k.name}" oninput="updateKind(${index}, 'name', this.value)" class="${inputClasses}" dir="auto"></div>
+                                <div><label class="${labelClasses}">${t('kind_geb')}</label><input type="date" value="${k.geburtsdatum}" onchange="updateKind(${index}, 'geburtsdatum', this.value)" class="${inputClasses} ltr-force" style="text-align: left;" dir="ltr"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <div><h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step7_title')}</h2><p class="text-slate-500 mt-2 text-base">${t('step7_text')}</p></div>
+                        
+                        <div class="p-6 bg-slate-50 border border-slate-100 rounded-3xl mt-6">
+                            <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 ml-1">Partner/in</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div><label class="${labelClasses}">${t('partner_name')}</label><input type="text" value="${data.partnerName}" oninput="data.partnerName = this.value" class="${inputClasses}" dir="auto"></div>
+                                <div><label class="${labelClasses}">${t('partner_geb')}</label><input type="date" value="${data.partnerGeburtsdatum}" onchange="data.partnerGeburtsdatum = this.value" class="${inputClasses} ltr-force" style="text-align: left;" dir="ltr"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider ml-1">Kinder</h3>
+                                ${data.kinder.length < 5 ? `<button onclick="addKind()" class="text-sm font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 py-2 px-4 rounded-xl transition-colors">${t('add_kind')}</button>` : ''}
+                            </div>
+                            ${kinderHtml}
+                        </div>
+                    </div>
+                `;
+            }
+            else if (currentStep === 8) {
+                let personOptions = `<option value="1">${data.vorname || t('applicant')}</option>`;
+                if (data.partnerName) personOptions += `<option value="2">${data.partnerName.split(',')[1] || data.partnerName}</option>`;
+                data.kinder.forEach((k, i) => { if (i < 4 && k.name) personOptions += `<option value="${i+3}">${k.name.split(',')[1] || k.name}</option>`; });
+
+                let typeOptions = `<option value="">${t('choose')}</option>`;
+                for (let i = 1; i <= 11; i++) { typeOptions += `<option value="${i}">${t('inc_'+i)}</option>`; }
+
+                let incListHtml = data.incomes.length === 0 ? `<div class="text-center p-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50 mt-4"><p class="text-sm text-slate-400 font-medium">${t('no_income_added')}</p></div>` : '';
+                data.incomes.forEach((inc, index) => {
+                    let pName = t('applicant');
+                    if(inc.personId === 2) pName = data.partnerName;
+                    else if(inc.personId >= 3) pName = data.kinder[inc.personId-3].name;
+
+                    incListHtml += `
+                        <div class="flex justify-between items-center p-4 bg-white shadow-sm border border-slate-100 rounded-2xl mt-3 hover:border-slate-200 transition-colors group">
+                            <div><span class="font-bold text-slate-800 text-sm block">${pName}</span><span class="text-xs font-medium text-slate-500">${t('inc_'+inc.typeId)}</span></div>
+                            <div class="flex items-center gap-4"><span class="text-slate-900 font-bold text-lg">${inc.amount} €</span><button onclick="removeIncome(${index})" class="text-slate-300 hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50">✕</button></div>
+                        </div>
+                    `;
+                });
+
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <div><h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step8_title')}</h2><p class="text-slate-500 mt-2 text-base">${t('step8_text')}</p></div>
+                        ${renderInfoBox(t('info_income'))}
+                        <div class="p-6 bg-slate-50 border border-slate-100 rounded-3xl mt-6 shadow-inner">
+                            <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+                                <div class="sm:col-span-4"><label class="${labelClasses}">${t('person')}</label><select id="inc_person" class="${inputClasses}">${personOptions}</select></div>
+                                <div class="sm:col-span-4"><label class="${labelClasses}">${t('type')}</label><select id="inc_type" class="${inputClasses}">${typeOptions}</select></div>
+                                <div class="sm:col-span-4"><label class="${labelClasses}">${t('amount')}</label>
+                                    <div class="flex gap-2">
+                                        <div class="relative w-full">
+                                            <input type="number" id="inc_amount" placeholder="0.00" class="${inputClasses} pr-8" dir="ltr">
+                                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">€</span>
+                                        </div>
+                                        <button onclick="addIncome()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 rounded-xl text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">${t('add')}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6">${incListHtml}</div>
+                    </div>
+                `;
+            }
+            else if (currentStep === 9) {
+                content.innerHTML = `
+                <div class="space-y-6 text-center py-8">
+                    <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-green-50 border-8 border-green-100 mb-4 text-green-500">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">${t('step9_title')}</h2>
+                    <p class="text-slate-500 text-base leading-relaxed max-w-md mx-auto">${t('step9_text')}</p>
+                </div>`;
+                btnNext.innerText = t('generate');
+                btnNext.onclick = fillOfficialPDF; 
+                btnNext.classList.replace('bg-red-600', 'bg-green-600');
+                btnNext.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
+            }
+            else if (currentStep === 99) {
+                content.innerHTML = `
+                <div class="space-y-6 text-center py-8">
+                    <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-red-50 border-8 border-red-100 mb-4 text-red-500">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">${t('no_entitlement_title')}</h2>
+                    <p class="text-slate-500 text-base leading-relaxed max-w-sm mx-auto">${t('no_entitlement_text')}</p>
+                </div>`;
+                btnNext.classList.add('hidden'); 
+            }
+        }
+
+        function selectOption(key, value) { data[key] = value; renderStep(); setTimeout(nextStep, 250); }
+        
+        function nextStep() {
+            if (currentStep === 1) { currentStep = 2; } 
+            else if (currentStep === 2) { if (data.isNewApplication === null) return; currentStep = 3; }
+            else if (currentStep === 3) {
+                if (data.livesInUlm === false) { currentStep = 99; renderStep(); return; }
+                if (data.livesInUlm === null) return; currentStep = 4;
+            } else if (currentStep === 4) { 
+                if (data.receivesBenefits === null) return; 
+                if (data.receivesBenefits === true) { currentStep = 5; } else { currentStep = 6; }
+            } else if (currentStep === 5) { 
+                if (!data.benefitType) return alert(t('fill_all')); currentStep = 6;
+            } else if (currentStep === 6) {
+                if (!data.name || !data.vorname || !data.geburtsdatum || !data.strasse || !data.ort) return alert(t('fill_all')); 
+                currentStep = 7;
+            } else if (currentStep === 7) {
+                if (data.receivesBenefits === false) { currentStep = 8; } else { currentStep = 9; }
+            } else if (currentStep === 8) {
+                currentStep = 9; 
+            }
+            renderStep();
+        }
+
+        function prevStep() {
+            if (currentStep === 9) { 
+                const btn = document.getElementById('btn-next');
+                btn.classList.replace('bg-green-600', 'bg-red-600'); 
+                btn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+                btn.onclick = nextStep;
+            }
+            if (currentStep > 1 && currentStep <= totalSteps) { 
+                currentStep--; 
+                if(currentStep === 8 && data.receivesBenefits === true) currentStep = 7;
+                if(currentStep === 5 && data.receivesBenefits === false) currentStep = 4;
+                renderStep(); 
+            }
+        }
+
+        // --- PDF GENERIERUNG ---
+        async function fillOfficialPDF() {
+            try {
+                const pdfFile = data.receivesBenefits ? 'antrag_leistungen.pdf' : 'antrag_einkommen.pdf';
+                const btn = document.getElementById('btn-next');
+                btn.innerText = "Erstelle Dokument...";
+                btn.disabled = true;
+
+                const existingPdfBytes = await fetch(pdfFile).then(res => {
+                    if (!res.ok) throw new Error("PDF nicht gefunden");
+                    return res.arrayBuffer();
+                });
+
+                const { PDFDocument } = PDFLib;
+                const pdfDoc = await PDFDocument.load(existingPdfBytes);
+                const form = pdfDoc.getForm();
+                const formatDate = (dateStr) => dateStr ? dateStr.split('-').reverse().join('.') : '';
+
+                const textFieldsToFill = {
+                    'Name Vorname der Antragstellerin  des Antragstellers Erziehungsberechtigter': `${data.name}, ${data.vorname}`,
+                    'Geburtsdatum': formatDate(data.geburtsdatum),
+                    'Anschrift Straße Hausnummer Postleitzahl Ort': `${data.strasse}, ${data.ort}`,
+                    'Telefonnummer': data.telefon,
+                    'Name Vorname des Partners': data.partnerName,
+                    'Geburtsdatum_2': formatDate(data.partnerGeburtsdatum),
+                };
+
+                const kindNameFields = ['Name Vorname des Kindes', 'Name Vorname des Kindes_2', 'Name Vorname des Kindes_3', 'Name Vorname des Kindes_4', 'Name Vorname des Kindes_5'];
+                const kindGebFields = ['Geburtsdatum_3', 'Geburtsdatum_4', 'Geburtsdatum_5', 'Geburtsdatum_6', 'Geburtsdatum_7'];
+
+                data.kinder.forEach((kind, i) => {
+                    if (i < 5) {
+                        textFieldsToFill[kindNameFields[i]] = kind.name;
+                        textFieldsToFill[kindGebFields[i]] = formatDate(kind.geburtsdatum);
+                    }
+                });
+
+                if (!data.receivesBenefits) {
+                    const columnSums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+                    let grandTotal = 0;
+
+                    data.incomes.forEach(inc => {
+                        const fieldName = `${inc.personId}Row${inc.typeId}`;
+                        textFieldsToFill[fieldName] = inc.amount + " €";
+                        const amt = parseFloat(inc.amount);
+                        columnSums[inc.personId] += amt;
+                        grandTotal += amt;
+                    });
+
+                    for (let i = 1; i <= 6; i++) {
+                        if (columnSums[i] > 0) textFieldsToFill[`Nettoeinkommen Person ${i}`] = columnSums[i].toFixed(2) + " €";
+                    }
+                    if (grandTotal > 0) textFieldsToFill['Gesamt'] = grandTotal.toFixed(2) + " €";
+                }
+
+                for (const [fieldName, value] of Object.entries(textFieldsToFill)) {
+                    if (!value) continue; 
+                    try {
+                        const field = form.getTextField(fieldName);
+                        if (field) field.setText(value);
+                    } catch (e) {}
+                }
+
+                const setCheckOrRadio = (fieldName, optionIndex = 0) => {
+                    if (!fieldName) return;
+                    try { const cb = form.getCheckBox(fieldName); cb.check(); return; } catch (err1) {}
+                    try { const rg = form.getRadioGroup(fieldName); const options = rg.getOptions(); if (options.length > optionIndex) rg.select(options[optionIndex]); return;} catch (err2) {}
+                };
+
+                const applicationTypeIndex = data.isNewApplication ? 0 : 1;
+                setCheckOrRadio('Antragsart', applicationTypeIndex);
+                setCheckOrRadio('Optionsfeld1', applicationTypeIndex);
+
+                if (data.receivesBenefits) {
+                    if (data.benefitType === 'Bürgergeld') setCheckOrRadio('Arbeitslosengeld II');
+                    if (data.benefitType === 'Wohngeld') setCheckOrRadio('Wohngeld');
+                    if (data.benefitType === 'Asylbewerber') setCheckOrRadio('Asylbewerberleistungen');
+                    if (data.benefitType === 'Grundsicherung') setCheckOrRadio('Sozialhilfe SGB XII');
+                    if (data.benefitType === 'Kinderzuschlag') setCheckOrRadio('Kinderzuschlag');
+                }
+
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: "application/pdf" });
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `Lobbycard_Antrag_${data.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+                link.click();
+
+                btn.innerText = "Antrag heruntergeladen ✓";
+                btn.classList.replace('bg-green-600', 'bg-slate-800');
+
+            } catch (error) {
+                console.error(error);
+                alert("Fehler bei der PDF-Generierung. Bitte prüfe, ob die PDF-Dateien auf dem Server liegen.");
+                const btn = document.getElementById('btn-next');
+                btn.innerText = t('generate');
+                btn.disabled = false;
+            }
+        }
+
+        // Init
+        renderStep();
+    </script>
+</body>
+</html>
