@@ -667,7 +667,7 @@
                     try { const rg = form.getRadioGroup(fieldName); const options = rg.getOptions(); if (options.length > optionIndex) rg.select(options[optionIndex]); return;} catch (err2) {}
                 };
 
-                const applicationTypeIndex = data.isNewApplication ? 0 : 1;
+                const applicationTypeIndex = data.isNewApplication ? 1: 0;
                 setCheckOrRadio('Antragsart', applicationTypeIndex);
                 setCheckOrRadio('Optionsfeld1', applicationTypeIndex);
 
